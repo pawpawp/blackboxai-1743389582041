@@ -1,43 +1,33 @@
 <?php
-// SQLite Database Configuration
-$db_file = 'file_tracking.db';
+// MySQL Database Configuration
+$db_host = 'localhost';
+$db_name = 'file_tracking';
+$db_user = 'root';
+$db_pass = '';
 
+// Verify MySQL server is running
 try {
-    $conn = new PDO("sqlite:$db_file");
+    $conn = new PDO("mysql:host=$db_host", $db_user, $db_pass);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    // Create tables if they don't exist
-    $conn->exec("CREATE TABLE IF NOT EXISTS incoming (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        status TEXT NOT NULL,
-        control_no TEXT UNIQUE NOT NULL,
-        date_received TEXT NOT NULL,
-        office_requestor TEXT NOT NULL,
-        transaction_type TEXT NOT NULL,
-        action_taken TEXT NOT NULL,
-        date_forwarded TEXT,
-        received_by TEXT NOT NULL,
-        remarks TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )");
+    // Create database if it doesn't exist
+    $conn->exec("CREATE DATABASE IF NOT EXISTS `$db_name`");
+    $conn->exec("USE `$db_name`");
     
-    $conn->exec("CREATE TABLE IF NOT EXISTS outgoing (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        control_no TEXT UNIQUE NOT NULL,
-        date TEXT NOT NULL,
-        time TEXT NOT NULL,
-        document TEXT NOT NULL,
-        client_name TEXT NOT NULL,
-        agency_office TEXT NOT NULL,
-        contact_no TEXT,
-        action_taken TEXT NOT NULL,
-        acted_by TEXT NOT NULL,
-        date_acted TEXT NOT NULL,
-        remarks TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )");
+    // Check if tables exist, if not create them
+    $tables = $conn->query("SHOW TABLES LIKE 'incoming'")->rowCount();
+    if ($tables == 0) {
+        $conn->exec(file_get_contents('database.sql'));
+    }
 } catch(PDOException $e) {
-    die("Error creating tables: " . $e->getMessage());
+    die("<h2>Database Connection Error</h2>
+        <p><b>Error:</b> " . $e->getMessage() . "</p>
+        <p>Please verify:</p>
+        <ol>
+            <li>XAMPP MySQL service is running</li>
+            <li>MySQL credentials in config.php are correct</li>
+            <li>MySQL user has proper permissions</li>
+        </ol>");
 }
 
 // Error reporting
