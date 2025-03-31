@@ -1,33 +1,66 @@
 <?php
-// MySQL Database Configuration
-$db_host = 'localhost';
-$db_name = 'file_tracking';
-$db_user = 'root';
-$db_pass = '';
+// Database Configuration
+$db_file = 'file_tracking.db';
+$use_mysql = false;
 
-// Verify MySQL server is running
+// First try MySQL connection
 try {
-    $conn = new PDO("mysql:host=$db_host", $db_user, $db_pass);
+    $db_host = 'localhost';
+    $db_name = 'file_tracking'; 
+    $db_user = 'root';
+    $db_pass = '';
+    
+    $conn = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $use_mysql = true;
     
-    // Create database if it doesn't exist
-    $conn->exec("CREATE DATABASE IF NOT EXISTS `$db_name`");
-    $conn->exec("USE `$db_name`");
-    
-    // Check if tables exist, if not create them
+    // Check if tables exist
     $tables = $conn->query("SHOW TABLES LIKE 'incoming'")->rowCount();
     if ($tables == 0) {
         $conn->exec(file_get_contents('database.sql'));
     }
-} catch(PDOException $e) {
-    die("<h2>Database Connection Error</h2>
-        <p><b>Error:</b> " . $e->getMessage() . "</p>
-        <p>Please verify:</p>
-        <ol>
-            <li>XAMPP MySQL service is running</li>
-            <li>MySQL credentials in config.php are correct</li>
-            <li>MySQL user has proper permissions</li>
-        </ol>");
+} catch(PDOException $mysql_e) {
+    // MySQL failed, try SQLite fallback
+    try {
+        $conn = new PDO("sqlite:$db_file");
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        // Create SQLite tables if they don't exist
+        $conn->exec("CREATE TABLE IF NOT EXISTS incoming (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT NOT NULL,
+            control_no TEXT UNIQUE NOT NULL,
+            date_received TEXT NOT NULL,
+            office_requestor TEXT NOT NULL,
+            transaction_type TEXT NOT NULL,
+            action_taken TEXT NOT NULL,
+            date_forwarded TEXT,
+            received_by TEXT NOT NULL,
+            remarks TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+        
+        $conn->exec("CREATE TABLE IF NOT EXISTS outgoing (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            control_no TEXT UNIQUE NOT NULL,
+            date TEXT NOT NULL,
+            time TEXT NOT NULL,
+            document TEXT NOT NULL,
+            client_name TEXT NOT NULL,
+            agency_office TEXT NOT NULL,
+            contact_no TEXT,
+            action_taken TEXT NOT NULL,
+            acted_by TEXT NOT NULL,
+            date_acted TEXT NOT NULL,
+            remarks TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch(PDOException $sqlite_e) {
+        die("<h2>Database Connection Error</h2>
+            <p>Failed to connect to both MySQL and SQLite databases.</p>
+            <p><b>MySQL Error:</b> {$mysql_e->getMessage()}</p>
+            <p><b>SQLite Error:</b> {$sqlite_e->getMessage()}</p>");
+    }
 }
 
 // Error reporting
